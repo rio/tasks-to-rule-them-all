@@ -2,10 +2,16 @@
 
 version: "3"
 
+includes:
+  utils:
+    taskfile: ../utils
+    internal: true
+
 tasks:
   create-cluster:
     silent: true
     aliases: [up]
+    run: once
     status:
       - k3d cluster get k3s-default
     cmds:
@@ -14,12 +20,14 @@ tasks:
           k3d cluster create \
             --registry-create registry.localhost:5000 \
             --image rancher/k3s:v1.30.1-k3s1 \
-            --k3s-arg "--disable=traefik@server:*"
+            --k3s-arg "--disable=traefik@server:*" \
+            --k3s-arg "--disable=metrics-server@server:*"
       - |
         gum spin --show-error --title="Waiting for coredns to be available..." -- \
           kubectl wait --for=condition=available deployment/coredns --namespace kube-system
 
-      - kubectl get nodes
+      - task: utils:log
+        vars: { MESSAGE: "k3d cluster started" }
 
   delete-cluster:
     silent: true
@@ -27,15 +35,40 @@ tasks:
     cmds:
       - gum spin --show-error --title="Deleting k3d cluster..." -- k3d cluster delete
 
-  build: docker build -t localhost:5000/echo-server ./
-  push: docker push localhost:5000/echo-server
-  apply: kubectl apply -k kubernetes/echo-server
-  logs: kubectl -n echo-server logs -f deployment/echo-server
-  restart:
+  deploy:
     silent: true
+    deps:
+      - task: create-cluster
+    vars:
+      SELECTED_SERVICES:
+        sh: '{{if empty .SERVICES}}ls kubernetes | gum filter --fuzzy --no-limit --header="Which services would you like to apply?" {{end}}'
+
+      SERVICES: "{{.SERVICES | default .SELECTED_SERVICES}}"
+
     cmds:
-      - kubectl -n echo-server rollout restart deployment/echo-server
-      - gum spin --title="Waiting for echo-server to restart" -- kubectl -n echo-server rollout status deployment/echo-server
+      - task: utils:log
+        vars: { MESSAGE: 'Deploying {{.SERVICES | splitList "\n"}}' }
+      - for: { var: SERVICES }
+        task: apply
+        vars:
+          MANIFESTS: "kubernetes/{{.ITEM}}"
+      - task: utils:log
+        vars: { MESSAGE: "All services deployed" }
+
+  apply:
+    silent: true
+    deps:
+      - task: create-cluster
+    requires:
+      vars: [MANIFESTS]
+    sources:
+      - "{{.MANIFESTS}}/*.yaml"
+    cmds:
+      - cmd: gum spin --show-error --title="Applying {{.MANIFESTS}} ..." -- kubectl apply -f <(kubectl kustomize --enable-helm {{.MANIFESTS}})
+      - task: utils:log
+        vars: { MESSAGE: "{{.MANIFESTS}} applied" }
+
+  logs: while true; do kubectl -n echo-server logs -f deployment/echo-server ; done
 
   call:
     silent: true

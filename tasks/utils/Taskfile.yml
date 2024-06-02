@@ -2,7 +2,7 @@
 version: "3"
 
 vars:
-  LOCAL_BIN_DIR: "{{.ROOT_DIR}}/.local/bin"
+  LOCAL_BIN_DIR: "{{.HOME}}/.local/bin"
   MISE_BIN: "{{.LOCAL_BIN_DIR}}/mise"
 
 tasks:
@@ -25,7 +25,6 @@ tasks:
           MESSAGE: "Starting bootstrap"
 
       - task: ensure-mise
-      - task: activate-mise
 
       - task: log
         vars:
@@ -36,6 +35,8 @@ tasks:
         vars:
           MESSAGE: Bootstrapping complete
 
+      - task: activate-mise
+
   activate-mise:
     silent: true
     status:
@@ -45,12 +46,12 @@ tasks:
       MISE_ACTIVATE_COMMAND: eval "$({{.MISE_BIN}} activate {{.SHELL | base}})"
       SHELL_STARTUP_FILE: "{{.HOME}}/.{{.SHELL | base}}rc"
 
-    # prompt: "Do you want to activate mise when you shell starts? Note this will edit your startup file {{.SHELL_STARTUP_FILE | quote}}"
-
     cmds:
+      - cmd: gum confirm "Do you want to activate mise when you shell starts? Note, this will edit your startup file {{.SHELL_STARTUP_FILE | quote}}"
       - cmd: echo {{.MISE_ACTIVATE_COMMAND | squote}} >> {{.SHELL_STARTUP_FILE}}
       - task: log
         vars:
+          LOG_LEVEL: warn
           MESSAGE: Please restart your shell for the change to take effect.
 
   ensure-mise:
@@ -75,7 +76,7 @@ tasks:
       MISE_OS: '{{if eq OS "darwin"}}macos{{else}}{{OS}}{{end}}'
       MISE_ARCH: '{{if eq ARCH "amd64"}}x64{{else}}{{ARCH}}{{end}}'
     cmds:
-      - gum spin --title="Downloading mise..." -- curl -sSfL https://mise.jdx.dev/mise-latest-{{.MISE_OS}}-{{.MISE_ARCH}} > {{.MISE_BIN}}
+      - gum spin --show-error --title="Downloading mise..." -- curl -sSfL https://mise.jdx.dev/mise-latest-{{.MISE_OS}}-{{.MISE_ARCH}} > {{.MISE_BIN}}
       - chmod +x {{.MISE_BIN}}
 
   ensure-gum:

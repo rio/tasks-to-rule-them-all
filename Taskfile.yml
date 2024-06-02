@@ -18,6 +18,16 @@ tasks:
   vet: go vet ./...
   fmt: go fmt ./...
 
+  bootstrap:
+    cmds:
+      - task: utils:bootstrap
+
+  test:
+    sources:
+      - "**/*.go"
+    cmds:
+      - go test ./...
+
   build:
     sources:
       - "**/*.go"
@@ -26,7 +36,7 @@ tasks:
     env:
       CGO_ENABLED: "0"
     cmds:
-      - "go build -v -o ./bin/echo-server ./cmd/echo-server/"
+      - go build -o ./bin/echo-server ./cmd/echo-server/
 
   start:
     deps:
@@ -38,42 +48,53 @@ tasks:
     silent: true
     vars:
       ENDPOINT: '{{.ENDPOINT | default "localhost:8080"}}'
-      MESSAGE: '{{.MESSAGE | default "👾"}}'
+      MESSAGE: '{{.MESSAGE | default "🙈🙉🙊"}}'
       JSON_MESSAGE: '{ "message": {{ .MESSAGE | quote }} }'
     cmds:
       - curl -i http://{{.ENDPOINT}}/echo -d {{.JSON_MESSAGE | quote}}
 
-  test:
-    sources:
-      - "**/*.go"
-    cmds:
-      - go test ./...
-
-  dev:
-    deps:
-      - task: utils:bootstrap
-    cmds:
-      - air --build.cmd "task build" --build.bin "./bin/echo-server"
-
-  deploy:
+  sync:
+    silent: true
     deps:
       - task: build
       - task: k8s:create-cluster
+    vars:
+      BINARY_CHECKSUM:
+        sh: "sha1sum ./bin/echo-server | cut -d ' ' -f 1"
+
+      IMAGE_NAME: "localhost:5000/echo-server"
+      IMAGE_TAG: '{{.IMAGE_NAME}}:{{.BINARY_CHECKSUM | default "latest"}}'
+
     sources:
-      - "**/*.go"
-      - "kubernetes/echo-server/*"
+      - "./bin/echo-server"
+      - "Dockerfile"
+
     cmds:
-      - task: k8s:build
-      - task: k8s:push
+      # build and push the container image
+      - gum spin --show-error --title="Building image {{.IMAGE_TAG}} ..." -- docker build --tag {{.IMAGE_TAG}} ./
+      - task: utils:log
+        vars: { MESSAGE: "Container image {{.IMAGE_TAG}} built" }
+
+      - gum spin --show-error --title="Pushing image {{.IMAGE_TAG}} ..." -- docker push {{.IMAGE_TAG}}
+      - task: utils:log
+        vars: { MESSAGE: "Container image {{.IMAGE_TAG}} pushed" }
+
+      # make sure all the resources have been created and update the image tag in the cluster
       - task: k8s:apply
-      - task: k8s:restart
+        vars: { MANIFESTS: "kubernetes/echo-server" }
+      - kubectl -n echo-server set image deployment/echo-server echo-server=registry.{{.IMAGE_TAG}}
 
   clean:
     silent: true
     ignore_error: true
     vars:
-      ITEMS_TO_CLEAN: ["./bin", "./tmp"]
+      ITEMS_TO_CLEAN: ["./bin", "./tmp", "./.task"]
     prompt: "Delete the following items? {{.ITEMS_TO_CLEAN}}"
     cmds:
       - for: { var: ITEMS_TO_CLEAN }
         cmd: rm -rv {{.ITEM}}
+
+  down:
+    cmds:
+      - task: k8s:delete-cluster
+      - task: clean

@@ -2,3 +2,4 @@
 .task
 bin
 tmp
+kubernetes/*/charts

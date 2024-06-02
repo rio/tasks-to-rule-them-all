@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"tasks-to-rule-them-all/pkg/config"
 	"testing"
 )
 
@@ -40,6 +41,13 @@ func TestCharacterCounter(t *testing.T) {
 func TestEchoHandler(t *testing.T) {
 	slog.SetLogLoggerLevel(slog.LevelError)
 
+	cfg, err := config.NewConfig()
+	if err != nil {
+		t.Fatal("building configuration failed", "error", err.Error())
+	}
+
+	server := NewServer(cfg)
+
 	request := httptest.NewRequest(
 		http.MethodPost,
 		"/echo",
@@ -48,7 +56,7 @@ func TestEchoHandler(t *testing.T) {
 
 	recorder := httptest.NewRecorder()
 
-	Echo(recorder, request)
+	server.Echo(recorder, request)
 
 	result := recorder.Result()
 

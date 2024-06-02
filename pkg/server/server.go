@@ -4,9 +4,18 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
+	"tasks-to-rule-them-all/pkg/config"
 )
 
-func Echo(w http.ResponseWriter, r *http.Request) {
+type Server struct {
+	cfg config.Config
+}
+
+func NewServer(cfg config.Config) Server {
+	return Server{cfg: cfg}
+}
+
+func (s *Server) Echo(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	logger := slog.With(slog.Group("http.request", "method", r.Method, "path", r.URL.Path))
@@ -29,8 +38,9 @@ func Echo(w http.ResponseWriter, r *http.Request) {
 	}
 
 	resp := Response{
-		Message: req.Message,
-		Count:   countCharacters(req.Message),
+		Message:       req.Message,
+		Count:         countCharacters(req.Message),
+		KubernetesEnv: s.cfg.Env,
 	}
 
 	jsonData, err := json.MarshalIndent(&resp, "", " ")
@@ -55,10 +65,11 @@ type Request struct {
 }
 
 type Response struct {
-	Message string `json:"message"`
-	Count   int    `json:"count"`
+	Message       string            `json:"message"`
+	Count         int               `json:"count"`
+	KubernetesEnv map[string]string `json:"kubernetesEnv,omitempty"`
 }
 
-func Healthz(w http.ResponseWriter, r *http.Request) {
+func (s *Server) Healthz(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }

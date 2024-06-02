@@ -4,6 +4,15 @@ kind: Kustomization
 namespace: echo-server
 
 resources:
-  - deployment.yaml
-  - namespace.yaml
-  - service.yaml
+- deployment.yaml
+- namespace.yaml
+- service.yaml
+
+images:
+- name: registry.localhost:5000/echo-server
+  newName: registry.localhost:5000/echo-server
+  newTag: latest
+
+replicas:
+- count: 1
+  name: echo-server
