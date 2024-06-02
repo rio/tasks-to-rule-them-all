@@ -1,0 +1,79 @@
+# https://taskfile.dev
+
+version: "3"
+
+includes:
+  k8s: tasks/k8s
+  utils:
+    taskfile: tasks/utils
+    internal: true
+
+interval: 20ms
+
+dotenv: [".env"]
+
+tasks:
+  default: task --list
+
+  vet: go vet ./...
+  fmt: go fmt ./...
+
+  build:
+    sources:
+      - "**/*.go"
+    generates:
+      - ./bin/echo-server
+    env:
+      CGO_ENABLED: "0"
+    cmds:
+      - "go build -v -o ./bin/echo-server ./cmd/echo-server/"
+
+  start:
+    deps:
+      - task: build
+    cmds:
+      - ./bin/echo-server
+
+  call:
+    silent: true
+    vars:
+      ENDPOINT: '{{.ENDPOINT | default "localhost:8080"}}'
+      MESSAGE: '{{.MESSAGE | default "👾"}}'
+      JSON_MESSAGE: '{ "message": {{ .MESSAGE | quote }} }'
+    cmds:
+      - curl -i http://{{.ENDPOINT}}/echo -d {{.JSON_MESSAGE | quote}}
+
+  test:
+    sources:
+      - "**/*.go"
+    cmds:
+      - go test ./...
+
+  dev:
+    deps:
+      - task: utils:bootstrap
+    cmds:
+      - air --build.cmd "task build" --build.bin "./bin/echo-server"
+
+  deploy:
+    deps:
+      - task: build
+      - task: k8s:create-cluster
+    sources:
+      - "**/*.go"
+      - "kubernetes/echo-server/*"
+    cmds:
+      - task: k8s:build
+      - task: k8s:push
+      - task: k8s:apply
+      - task: k8s:restart
+
+  clean:
+    silent: true
+    ignore_error: true
+    vars:
+      ITEMS_TO_CLEAN: ["./bin", "./tmp"]
+    prompt: "Delete the following items? {{.ITEMS_TO_CLEAN}}"
+    cmds:
+      - for: { var: ITEMS_TO_CLEAN }
+        cmd: rm -rv {{.ITEM}}

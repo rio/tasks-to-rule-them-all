@@ -1,0 +1,114 @@
+# https://taskfile.dev
+version: "3"
+
+vars:
+  LOCAL_BIN_DIR: "{{.ROOT_DIR}}/.local/bin"
+  MISE_BIN: "{{.LOCAL_BIN_DIR}}/mise"
+
+tasks:
+  bootstrap:
+    silent: true
+    platforms: [darwin/amd64, darwin/arm64, linux/amd64, linux/arm64]
+    preconditions:
+      - sh: command -v curl > /dev/null
+        msg: Please make sure curl is installed and in your $PATH.
+      - sh: command -v tar > /dev/null
+        msg: Please make sure tar is installed and in your $PATH.
+      - sh: docker info > /dev/null
+        msg: Please make sure docker is installed, running and in your $PATH.
+    cmds:
+      - cmd: mkdir -p {{.LOCAL_BIN_DIR}}
+      - task: ensure-gum
+
+      - task: log
+        vars:
+          MESSAGE: "Starting bootstrap"
+
+      - task: ensure-mise
+      - task: activate-mise
+
+      - task: log
+        vars:
+          MESSAGE: Installing mise based tools from .tool-versions
+      - cmd: "{{.MISE_BIN}} install --yes"
+
+      - task: log
+        vars:
+          MESSAGE: Bootstrapping complete
+
+  activate-mise:
+    silent: true
+    status:
+      - grep {{.MISE_ACTIVATE_COMMAND | squote}} {{.SHELL_STARTUP_FILE}}
+
+    vars:
+      MISE_ACTIVATE_COMMAND: eval "$({{.MISE_BIN}} activate {{.SHELL | base}})"
+      SHELL_STARTUP_FILE: "{{.HOME}}/.{{.SHELL | base}}rc"
+
+    # prompt: "Do you want to activate mise when you shell starts? Note this will edit your startup file {{.SHELL_STARTUP_FILE | quote}}"
+
+    cmds:
+      - cmd: echo {{.MISE_ACTIVATE_COMMAND | squote}} >> {{.SHELL_STARTUP_FILE}}
+      - task: log
+        vars:
+          MESSAGE: Please restart your shell for the change to take effect.
+
+  ensure-mise:
+    silent: true
+    status:
+      - test -x {{.MISE_BIN}}
+    cmds:
+      - cmd: |
+          if command -v mise > /dev/null ; then
+            ln -s $(command -v mise) {{.MISE_BIN}}
+          fi
+      - task: download-mise
+      - task: log
+        vars:
+          MESSAGE: Using mise $({{.MISE_BIN}} version) at {{.MISE_BIN}}
+
+  download-mise:
+    silent: true
+    status:
+      - test -x {{.MISE_BIN}}
+    vars:
+      MISE_OS: '{{if eq OS "darwin"}}macos{{else}}{{OS}}{{end}}'
+      MISE_ARCH: '{{if eq ARCH "amd64"}}x64{{else}}{{ARCH}}{{end}}'
+    cmds:
+      - gum spin --title="Downloading mise..." -- curl -sSfL https://mise.jdx.dev/mise-latest-{{.MISE_OS}}-{{.MISE_ARCH}} > {{.MISE_BIN}}
+      - chmod +x {{.MISE_BIN}}
+
+  ensure-gum:
+    silent: true
+    preconditions:
+      - sh: '{{ env "PATH" | splitList ":" | has .LOCAL_BIN_DIR }}'
+        msg: Local binary directory not found in your $PATH. Run `export PATH=$PATH:{{.LOCAL_BIN_DIR}}` to add it.
+    status:
+      - '[[ "$(gum --version)" == *"{{.GUM_VERSION}}"* ]]'
+    vars:
+      GUM_VERSION: 0.14.1
+      GUM_URL: https://github.com/charmbracelet/gum/releases/download
+      GUM_OS: "{{ OS | title }}"
+      GUM_ARCH: '{{if eq ARCH "amd64"}}x86_64{{else if eq ARCH "arm64"}}arm64{{else}}{{fail}}{{end}}'
+      GUM_VERSION_OS_ARCH: "gum_{{.GUM_VERSION}}_{{.GUM_OS}}_{{.GUM_ARCH}}"
+    cmds:
+      - cmd: curl -sSfL {{.GUM_URL}}/v{{.GUM_VERSION}}/{{.GUM_VERSION_OS_ARCH}}.tar.gz | tar -C  {{.LOCAL_BIN_DIR}} -xzf - --strip-components 1 {{.GUM_VERSION_OS_ARCH}}/gum
+      - task: log
+        vars:
+          MESSAGE: gum {{.GUM_VERSION}} installed
+
+  log:
+    silent: true
+    requires:
+      vars:
+        - MESSAGE
+    vars:
+      LOG_LEVEL: '{{.LOG_LEVEL | default "info"}}'
+      LOG_FORMATTER: '{{if eq .CI "true"}}logfmt{{else}}text{{end}}'
+    cmds:
+      - cmd: |
+          gum log \
+            --time=rfc3339 \
+            --level={{.LOG_LEVEL}} \
+            --formatter={{.LOG_FORMATTER}} \
+            {{.MESSAGE | quote}}

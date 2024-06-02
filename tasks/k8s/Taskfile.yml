@@ -1,0 +1,60 @@
+# https://taskfile.dev
+
+version: "3"
+
+tasks:
+  create-cluster:
+    silent: true
+    aliases: [up]
+    status:
+      - k3d cluster get k3s-default
+    cmds:
+      - |
+        gum spin --show-error --title="Starting k3d cluster..." -- \
+          k3d cluster create \
+            --registry-create registry.localhost:5000 \
+            --image rancher/k3s:v1.30.1-k3s1 \
+            --k3s-arg "--disable=traefik@server:*"
+      - |
+        gum spin --show-error --title="Waiting for coredns to be available..." -- \
+          kubectl wait --for=condition=available deployment/coredns --namespace kube-system
+
+      - kubectl get nodes
+
+  delete-cluster:
+    silent: true
+    aliases: [down]
+    cmds:
+      - gum spin --show-error --title="Deleting k3d cluster..." -- k3d cluster delete
+
+  build: docker build -t localhost:5000/echo-server ./
+  push: docker push localhost:5000/echo-server
+  apply: kubectl apply -k kubernetes/echo-server
+  logs: kubectl -n echo-server logs -f deployment/echo-server
+  restart:
+    silent: true
+    cmds:
+      - kubectl -n echo-server rollout restart deployment/echo-server
+      - gum spin --title="Waiting for echo-server to restart" -- kubectl -n echo-server rollout status deployment/echo-server
+
+  call:
+    silent: true
+    vars:
+      ENDPOINT:
+        sh: "kubectl -n echo-server get svc/echo-server --output=jsonpath='{.status.loadBalancer.ingress[0].ip}'"
+    cmds:
+      - cmd: task call MESSAGE="hello from k8s" ENDPOINT={{.ENDPOINT}}
+
+  notrouble:
+    silent: true
+    vars:
+      KUBENT_RUN:
+        sh: echo "kubent-$(date -Idate)"
+    cmds:
+      - kubectl create ns {{.KUBENT_RUN}}
+      - defer: kubectl delete ns {{.KUBENT_RUN}}
+
+      - kubectl create clusterrolebinding {{.KUBENT_RUN}} --serviceaccount {{.KUBENT_RUN}}:default --clusterrole=cluster-admin
+      - defer: kubectl delete clusterrolebinding {{.KUBENT_RUN}}
+
+      - kubectl run kubent -n {{.KUBENT_RUN}} --attach --rm --image ghcr.io/doitintl/kube-no-trouble -- {{.CLI_ARGS}}
