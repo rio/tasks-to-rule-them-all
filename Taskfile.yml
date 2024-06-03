@@ -19,16 +19,31 @@ tasks:
   fmt: go fmt ./...
 
   bootstrap:
+    desc: "Install any dependencies required. (Hint: run this first)"
+    summary: |
+      This task will install all dependencies required to build, test and run this project.
+      Some dependencies are implied but are still checked by this task.
     cmds:
       - task: utils:bootstrap
 
   test:
+    desc: "Runs all the project's tests."
     sources:
       - "**/*.go"
     cmds:
       - go test ./...
 
   build:
+    desc: "Builds the echo-server."
+    summary: |
+      Uses the go compiler to build the echo-server.
+
+      This task is setup using the `sources` and `generates` fields which means
+      that this task can dynamically rebuild if any of the files in `sources`
+      change.
+
+      To make use of this feature run this, or any task that depends on this
+      task, with `--watch`.
     sources:
       - "**/*.go"
     generates:
@@ -38,7 +53,17 @@ tasks:
     cmds:
       - go build -o ./bin/echo-server ./cmd/echo-server/
 
-  start:
+  server:
+    desc: "Builds and starts the echo-server."
+    summary: |
+      Simply runs the pre-built echo-server binary. It depends on the `build` task
+      which means that it will make sure the `build` task sucessfully completes
+      before starting the server.
+
+      It also means that it inherits the watch behaviour of that build task.
+      Run this task with the `--watch` flag and change a `*.go` file to see the
+      effects.
+    aliases: [start]
     deps:
       - task: build
     cmds:
@@ -50,8 +75,23 @@ tasks:
       ENDPOINT: '{{.ENDPOINT | default "localhost:8080"}}'
       MESSAGE: '{{.MESSAGE | default "🙈🙉🙊"}}'
       JSON_MESSAGE: '{ "message": {{ .MESSAGE | quote }} }'
+      MESSAGE_FILE:
+        sh: "mktemp"
     cmds:
-      - curl -i http://{{.ENDPOINT}}/echo -d {{.JSON_MESSAGE | quote}}
+      - echo {{.JSON_MESSAGE | quote}} > {{.MESSAGE_FILE}}
+      - defer: rm {{.MESSAGE_FILE}}
+      - curl -si http://{{.ENDPOINT}}/echo -d @{{.MESSAGE_FILE}}
+
+  clean:
+    silent: true
+    ignore_error: true
+    vars:
+      ITEMS_TO_CLEAN: ["./bin", "./tmp", "./.task"]
+    prompt: "Delete the following items? {{.ITEMS_TO_CLEAN}}"
+    cmds:
+      - for:
+          var: ITEMS_TO_CLEAN
+        cmd: rm -rv {{.ITEM}}
 
   sync:
     silent: true
@@ -83,16 +123,6 @@ tasks:
       - task: k8s:apply
         vars: { MANIFESTS: "kubernetes/echo-server" }
       - kubectl -n echo-server set image deployment/echo-server echo-server=registry.{{.IMAGE_TAG}}
-
-  clean:
-    silent: true
-    ignore_error: true
-    vars:
-      ITEMS_TO_CLEAN: ["./bin", "./tmp", "./.task"]
-    prompt: "Delete the following items? {{.ITEMS_TO_CLEAN}}"
-    cmds:
-      - for: { var: ITEMS_TO_CLEAN }
-        cmd: rm -rv {{.ITEM}}
 
   down:
     cmds:

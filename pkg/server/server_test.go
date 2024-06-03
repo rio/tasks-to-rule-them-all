@@ -51,7 +51,7 @@ func TestEchoHandler(t *testing.T) {
 	request := httptest.NewRequest(
 		http.MethodPost,
 		"/echo",
-		strings.NewReader(`{"message": test}`),
+		strings.NewReader(`{"message": "test"}`),
 	)
 
 	recorder := httptest.NewRecorder()
