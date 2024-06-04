@@ -407,7 +407,7 @@ build:
     - go build -o ./bin/echo-server ./cmd/echo-server/
 ```
 
-> I've removed the `tasks`, `desc` and `summary` fields for brevity from this point onward.
+> I've removed the `tasks`, `desc` and `summary` fields for brevity.
 
 <!-- end_slide -->
 ## Speak Task And Enter
