@@ -61,11 +61,12 @@ tasks:
       before starting the server.
 
       It also means that it inherits the watch behaviour of that build task.
-      Run this task with the `--watch` flag and change a `*.go` file to see the
-      effects.
-    aliases: [start]
+      This is enabled by default for this task.
+      Run this task and change a `*.go` file to see its effects.
+    aliases: [start, up]
     deps:
       - task: build
+    watch: true
     cmds:
       - ./bin/echo-server
 
@@ -83,6 +84,7 @@ tasks:
       - curl -si http://{{.ENDPOINT}}/echo -d @{{.MESSAGE_FILE}}
 
   clean:
+    desc: "Deletes the build files."
     silent: true
     ignore_error: true
     vars:
@@ -100,7 +102,7 @@ tasks:
       - task: k8s:create-cluster
     vars:
       BINARY_CHECKSUM:
-        sh: "sha1sum ./bin/echo-server | cut -d ' ' -f 1"
+        sh: "cat Dockerfile ./bin/echo-server | sha256sum | cut -d ' ' -f 1"
 
       IMAGE_NAME: "localhost:5000/echo-server"
       IMAGE_TAG: '{{.IMAGE_NAME}}:{{.BINARY_CHECKSUM | default "latest"}}'
@@ -108,6 +110,7 @@ tasks:
     sources:
       - "./bin/echo-server"
       - "Dockerfile"
+      - "kubernetes/echo-server/*.yaml"
 
     cmds:
       # build and push the container image
@@ -125,6 +128,8 @@ tasks:
       - kubectl -n echo-server set image deployment/echo-server echo-server=registry.{{.IMAGE_TAG}}
 
   down:
+    desc: "Removes both the k8s cluster and build files."
+    aliases: [destroy, get-rekt]
     cmds:
       - task: k8s:delete-cluster
       - task: clean

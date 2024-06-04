@@ -176,14 +176,12 @@ A workflow tool should help me:
 
 <!-- end_slide -->
 
-## Speak Task And Enter
+## Task, You Fools
 
 ---
 
 🚀 Install Task
 ---
-
-> NOTE: Restart this presentation in the demo environment
 
 ```bash +exec
 sh -c "$(curl -sSfL https://taskfile.dev/install.sh)" -- \
@@ -191,53 +189,58 @@ sh -c "$(curl -sSfL https://taskfile.dev/install.sh)" -- \
 ```
 
 <!-- end_slide -->
-
-## Speak Task And Enter
-
----
-
-🚀 Default Task
----
-
-```bash +exec
-task
-```
-
-<!-- end_slide -->
-
-## Speak Task And Enter
+## Run, You Tasks
 
 ---
 
-🚀 Task Summary
+Happy Flows
 ---
 
-```bash +exec
-task --summary bootstrap
-```
+<!-- column_layout: [1,1] -->
 
-<!-- end_slide -->
+<!-- pause -->
+<!-- column: 0 -->
+### Local Server Flow
 
-## Speak Task And Enter
+- `task bootstrap`
+- `task server`
+- `task call`
 
----
+<!-- pause -->
+### Local Testing Flow
 
-Presenter please do the following
----
+- `task bootstrap`
+- `task test`
+- `task test --watch`
+
+<!-- column: 1 -->
+<!-- pause -->
+### Remote Server Flow
+
+- `task sync`
+- `task k8s:logs`
+- `task k8s:call`
+- `task sync --watch`
+
 <!-- pause -->
 
-<!-- incremental_lists: true -->
+### Cleanup
 
-- Run bootstrap in other terminal
-- Run bootstrap again, note it's idempotent!
-- Run bootstrap again but from zsh *(Hint: use chsh)*
-- Run `zellij --layout compact`
-- Run `task start`
-- In another pane run `task call`
-- Close this presentation (*not yet!*)
-- Restart the shell session
-- Start this presentation again
-- Now close this presentation
+- `task down`
+
+<!-- end_slide -->
+## Speak Task And Enter
+
+---
+
+How do I hold this thing?
+---
+
+```bash
+task
+task --summary bootstrap
+task --summary server
+```
 
 <!-- end_slide -->
 
@@ -252,32 +255,7 @@ So, what's a task?
 task --init && bat Taskfile.yml
 ```
 
-```yaml +line_numbers
-version: '3'
-
-vars:
-  GREETING: Hello, World!
-
-tasks:
-  default:
-    cmds:
-      - echo "{{.GREETING}}"
-    silent: true
-```
-<!-- end_slide -->
-
-## Speak Task And Enter
-
----
-
-So, what's a task?
----
-
-```bash
-task --init && bat Taskfile.yml
-```
-
-```yaml +line_numbers {1|3,4|6,7|8,9|10}
+```yaml +line_numbers {all|1|3,4|6,7|8,9|10|all}
 version: '3'
 
 vars:
@@ -296,7 +274,7 @@ tasks:
 ---
 <!-- newlines: 1 -->
 
-```yaml +line_numbers {3,4,9-14}
+```yaml +line_numbers {all|3,4,9-14|all}
 version: '3'
 
 include:
@@ -313,6 +291,53 @@ dotenv: [.env, .envrc]
 set: [pipefail]
 
 tasks: ...
+```
+<!-- end_slide -->
+
+## You Shall Not Task
+
+---
+
+Can it help me prevent layer 8 problems?
+---
+<!-- pause -->
+
+### Preconditions
+
+```yaml
+preconditions:
+  - sh: command -v curl > /dev/null
+    msg: Please make sure curl is installed and in your $PATH.
+```
+
+<!-- pause -->
+### Prompts
+
+```yaml
+prompt: "Delete the following items? {{.ITEMS_TO_CLEAN}}"
+```
+<!-- end_slide -->
+
+## You Shall Not Task
+
+---
+
+Can it help me prevent layer 8 problems?
+---
+
+### Status
+
+```yaml
+status:
+  - '[[ "$(gum --version)" == *"{{.GUM_VERSION}}"* ]]'
+```
+<!-- pause -->
+
+### Requires
+
+```yaml
+requires:
+  vars: [MANIFESTS]
 ```
 <!-- end_slide -->
 
@@ -343,19 +368,21 @@ task fmt vet
 Task Sources
 ---
 
-```yaml +line_numbers {all|5,6|3,4|all}
-test:
-  desc: "Runs all the project's tests."
-  sources:
-    - "**/*.go"
-  cmds:
-    - go test ./...
+```yaml +line_numbers {all|6,7|4,5|all}
+tasks:
+  test:
+    desc: "Runs all the project's tests."
+    sources:
+      - "**/*.go"
+    cmds:
+      - go test ./...
 ```
 
 <!-- pause -->
 ---
 
 ```bash
+task test
 task test --watch
 ```
 
@@ -379,7 +406,7 @@ build:
     - go build -o ./bin/echo-server ./cmd/echo-server/
 ```
 
-> I've removed the `desc` and `summary` fields for brevity from here on out.
+> I've removed the `tasks`, `desc` and `summary` fields for brevity from this point onward.
 
 <!-- end_slide -->
 ## Speak Task And Enter
@@ -389,11 +416,12 @@ build:
 Task Deps
 ---
 
-```yaml +line_numbers {all|3,4|2|all}
+```yaml +line_numbers {all|3,4|5|2|all}
 server:
-  aliases: [start]
+  aliases: [start, up]
   deps:
     - task: build
+  watch: true
   cmds:
     - ./bin/echo-server
 ```
@@ -402,7 +430,7 @@ server:
 ---
 
 ```bash
-task server --watch
+task server
 ```
 
 <!-- end_slide -->
@@ -487,81 +515,7 @@ clean:
       cmd: rm -rv {{.ITEM}}
 ```
 
-<!-- pause -->
 > You can combine `for` with `sources` to loop over folders and files!
-<!-- pause -->
----
-
-```bash
-task clean
-```
-
-<!-- end_slide -->
-
-## Speak Task And Enter
-
----
-
-What else?
----
-<!-- pause -->
-
-### Preconditions
-<!-- pause -->
-
-```yaml
-preconditions:
-  - sh: command -v curl > /dev/null
-    msg: Please make sure curl is installed and in your $PATH.
-```
-<!-- pause -->
-
-### Status
-<!-- pause -->
-
-```yaml
-status:
-  - '[[ "$(gum --version)" == *"{{.GUM_VERSION}}"* ]]'
-```
-<!-- pause -->
-
-### Requires
-<!-- pause -->
-
-```yaml
-requires:
-  vars: [MANIFESTS]
-```
-<!-- end_slide -->
-
-## Speak Task And Enter
-
----
-
-Super speedy demos if time permits
----
-
-### Kubernetes App Dev Flow
-
-- `zellij run -- task sync --watch`
-- `zellij run -- task k8s:logs`
-- `task k8s:call`
-- `nvim cmd/echo-server/main.go`
-
-### Kubernetes Manifests Dev Flow
-
-- `zellij run -- k9s --headless --namespace echo-server -c pods`
-- `task k8s:apply`
-- `zellij run -- task k8s:apply MANIFESTS=kubernetes/echo-server --watch`
-- `nvim kubernetes/echo-server/kustomization.yaml`
-
-### Kubernetes Service Deployment
-
-- `zellij run -- k9s --headless --all-namespaces -c pods`
-- `task k8s:deploy SERVICES="echo-server metrics-server"`
-- `task k8s:deploy`
-
-### From 0 To Deployed on Kubernetes
 
 <!-- end_slide -->
 ## Questions
