@@ -240,6 +240,7 @@ How do I hold this thing?
 task
 task --summary bootstrap
 task --summary server
+task --summary sync
 ```
 
 <!-- end_slide -->

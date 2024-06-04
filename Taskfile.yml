@@ -96,6 +96,7 @@ tasks:
         cmd: rm -rv {{.ITEM}}
 
   sync:
+    desc: "Build and launch the server in a cluster"
     silent: true
     deps:
       - task: build
