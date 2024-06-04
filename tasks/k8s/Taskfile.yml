@@ -78,6 +78,8 @@ tasks:
     cmds:
       - cmd: task call MESSAGE="hello from k8s" ENDPOINT={{.ENDPOINT}}
 
+  console: k9s --headless --namespace echo-server
+
   notrouble:
     silent: true
     vars:

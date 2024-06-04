@@ -221,6 +221,7 @@ Happy Flows
 - `task k8s:logs`
 - `task k8s:call`
 - `task sync --watch`
+- `task k8s:deploy`
 
 <!-- pause -->
 
